@@ -5,8 +5,7 @@ Android 加载大图  可以高清显示10000*10000像素的图片
 其中 android-gesture-detectors-lib 手势类库  
 源地址https://github.com/Almeros/android-gesture-detectors
 
-本库fork自https://github.com/LuckyJayce/LargeImage
-将其修改成Android studio项目格式
+本库fork自https://github.com/LuckyJayce/LargeImage，并将其修改成Android Studio project
 
 # 联系方式和问题建议
 
