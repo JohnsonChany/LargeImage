@@ -4,8 +4,6 @@
 
     <uses-configuration android:reqTouchScreen="finger" />
 
-    <uses-sdk android:minSdkVersion="9" />
-
     <uses-feature
         android:name="android.hardware.touchscreen"
         android:required="true" />
