@@ -27,10 +27,11 @@ import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.Log;
 
-import com.shizhefei.view.largeimage.ImageManager.DrawData;
-import com.shizhefei.view.largeimage.ImageManager.OnImageLoadListenner;
+import com.shizhefei.view.largeimage.model.DrawData;
+import com.shizhefei.view.largeimage.manager.ImageManager;
+import com.shizhefei.view.largeimage.manager.ImageManager.OnImageLoadListener;
 
-public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoadListenner {
+public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoadListener {
 
 	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 	public LargeImageView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
