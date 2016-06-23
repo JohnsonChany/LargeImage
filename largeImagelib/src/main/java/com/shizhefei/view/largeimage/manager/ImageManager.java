@@ -46,7 +46,13 @@ import com.shizhefei.view.largeimage.model.Position;
 
 public class ImageManager {
 
+    /**
+     * Send Msg to load thumbnail for the whole picture
+     */
     public static final int MESSAGE_PIC = 665;
+    /**
+     * LoadData{@link LoadData} load complete
+     */
     public static final int MESSAGE_LOAD = 666;
     public static final int MESSAGE_BLOCK_1 = 1;
     public static final int MESSAGE_BLOCK_2 = 2;
