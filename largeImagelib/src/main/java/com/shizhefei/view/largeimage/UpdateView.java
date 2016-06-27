@@ -146,27 +146,31 @@ public abstract class UpdateView extends View {
         final boolean visibleChanged = mVisible != mRequestedVisible;
         if (force || visibleChanged || tempLocationInWindow[0] != mLocation[0] || tempLocationInWindow[1] != mLocation[1] || redrawNeeded) {
             this.mLocation = tempLocationInWindow;
-            Rect visiableRect = getVisiableRect();
-            if (mVisiableRect == null || !mVisiableRect.equals(visiableRect)) {
-                this.mVisiableRect = visiableRect;
-                onUpdateWindow(visiableRect);
+            Rect visibleRect = getVisibleRect();
+            if (mVisibleRect == null || !mVisibleRect.equals(visibleRect)) {
+                this.mVisibleRect = visibleRect;
+                onUpdateWindow(visibleRect);
             }
         }
     }
 
-    private Rect mVisiableRect;
+    private Rect mVisibleRect;
 
-    protected abstract void onUpdateWindow(Rect visiableRect);
+    protected abstract void onUpdateWindow(Rect visibleRect);
 
-    protected Rect getVisiableRect() {
-        Rect visiableRect = new Rect();
-        getGlobalVisibleRect(visiableRect);
+    /**
+     *
+     * @return
+     */
+    protected Rect getVisibleRect() {
+        Rect visibleRect = new Rect();
+        getGlobalVisibleRect(visibleRect);
         int[] location = new int[2];
         getLocationOnScreen(location);
-        visiableRect.left = visiableRect.left - location[0];
-        visiableRect.right = visiableRect.right - location[0];
-        visiableRect.top = visiableRect.top - location[1];
-        visiableRect.bottom = visiableRect.bottom - location[1];
-        return visiableRect;
+        visibleRect.left = visibleRect.left - location[0];
+        visibleRect.right = visibleRect.right - location[0];
+        visibleRect.top = visibleRect.top - location[1];
+        visibleRect.bottom = visibleRect.bottom - location[1];
+        return visibleRect;
     }
 }

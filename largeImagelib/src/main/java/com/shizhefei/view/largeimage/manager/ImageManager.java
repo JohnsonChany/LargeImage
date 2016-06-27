@@ -131,12 +131,13 @@ public class ImageManager {
     }
 
     /**
-     * @param imageScale 图片width/屏幕width 的值。也就是说如果imageScale = 4，表示图片的400像素用来当做显示100像素<br>
-     *                   imageScale越大一个单位点position包含的blockSize的正方形图片真实像素就越多<br>
-     *                   （blockSize*imageScale的图片实际像素,
-     *                   imageScale也可以理解为一个position点拥有的blockSize的正方形个数）
+     * @param imageScale
+     *        图片width/屏幕width 的值。也就是说如果imageScale = 4，表示图片的400像素显示在屏幕的100像素中，
+     *        imageScale越大一个单位点position包含的blockSize的正方形图片真实像素就越多。<br>
+     *        （blockSize*imageScale为图片实际像素,imageScale也可以理解为一个position点拥有的blockSize
+     *        正方形的个数）
      * @param imageRect
-     * @return
+     * @return  {@code List<DrawData>}
      */
     public List<DrawData> getDrawData(float imageScale, Rect imageRect) {
         long startTime = SystemClock.uptimeMillis();
@@ -540,18 +541,6 @@ public class ImageManager {
         return (int) (dipValue * scale + 0.5f);
     }
 
-    private static class MessageData {
-        Position position;
-        int scale;
-
-        public MessageData(Position position, int scale) {
-            super();
-            this.position = position;
-            this.scale = scale;
-        }
-
-    }
-
     public void destroy() {
         handlerThread.quit();
         handlerThread = null;
@@ -607,6 +596,18 @@ public class ImageManager {
         @Override
         public BitmapRegionDecoder made() throws IOException {
             return BitmapRegionDecoder.newInstance(path, false);
+        }
+
+    }
+
+    private static class MessageData {
+        Position position;
+        int scale;
+
+        public MessageData(Position position, int scale) {
+            super();
+            this.position = position;
+            this.scale = scale;
         }
 
     }

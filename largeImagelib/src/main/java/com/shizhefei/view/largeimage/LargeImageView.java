@@ -19,6 +19,8 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -34,25 +36,38 @@ import com.shizhefei.view.largeimage.model.Scale;
 
 public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoadListener {
 
+    private Paint paint;
+
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public LargeImageView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         imageManager = new ImageManager(context);
+        initPaint();
+    }
+
+    private void initPaint() {
+        paint = new Paint();
+        paint.setColor(Color.RED);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(2);
     }
 
     public LargeImageView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         imageManager = new ImageManager(context);
+        initPaint();
     }
 
     public LargeImageView(Context context, AttributeSet attrs) {
         super(context, attrs);
         imageManager = new ImageManager(context);
+        initPaint();
     }
 
     public LargeImageView(Context context) {
         super(context);
         imageManager = new ImageManager(context);
+        initPaint();
     }
 
     public void setScale(float scale, float offsetX, float offsetY) {
@@ -116,10 +131,10 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
     }
 
     @Override
-    protected void onUpdateWindow(Rect visiableRect) {
+    protected void onUpdateWindow(Rect visibleRect) {
         preInvalidateTime = SystemClock.uptimeMillis();
         runnable = null;
-        invalidate(getVisiableRect());
+        invalidate(getVisibleRect());
     }
 
     private volatile long preInvalidateTime;
@@ -144,7 +159,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
                     preInvalidateTime = SystemClock.uptimeMillis();
                     runnable = null;
                     Log.d("eeee", "preInvalidateTime:" + preInvalidateTime);
-                    invalidate(getVisiableRect());
+                    invalidate(getVisibleRect());
                 }
             }, LOOP_TIME - deltaTime);
         } else {
@@ -153,7 +168,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
                 preInvalidateTime = SystemClock.uptimeMillis();
                 runnable = null;
                 Log.d("eeee", "preInvalidateTime:" + preInvalidateTime);
-                invalidate(getVisiableRect());
+                invalidate(getVisibleRect());
             } else {
                 LargeImageView.this.post(runnable = new Runnable() {
 
@@ -162,7 +177,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
                         preInvalidateTime = SystemClock.uptimeMillis();
                         runnable = null;
                         Log.d("eeee", "preInvalidateTime:" + preInvalidateTime);
-                        invalidate(getVisiableRect());
+                        invalidate(getVisibleRect());
                     }
                 });
             }
@@ -180,9 +195,9 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
 
         long startTime = SystemClock.uptimeMillis();
 
-        Rect visibleRect = getVisiableRect();
+        Rect visibleRect = getVisibleRect();
 
-        Log.d("countTime", "getVisiableRect " + (SystemClock.uptimeMillis() - startTime));
+        Log.d("countTime", "getVisibleRect " + (SystemClock.uptimeMillis() - startTime));
         startTime = SystemClock.uptimeMillis();
 
         Log.d("cccc", "onDraw onUpdateWindow " + visibleRect);
@@ -230,6 +245,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
             drawRect.right = (int) (Math.ceil(drawRect.right / imageScale) - mScale.getFromX());
             drawRect.bottom = (int) (Math.ceil(drawRect.bottom / imageScale) - mScale.getFromY());
             canvas.drawBitmap(data.bitmap, data.srcRect, drawRect, null);
+            canvas.drawRect(drawRect, paint);
         }
 
         Log.d("countTime", "draw " + (SystemClock.uptimeMillis() - startTime));
