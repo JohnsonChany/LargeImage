@@ -171,6 +171,15 @@ public abstract class UpdateView extends View {
         visibleRect.right = visibleRect.right - location[0];
         visibleRect.top = visibleRect.top - location[1];
         visibleRect.bottom = visibleRect.bottom - location[1];
+
+        Rect visibleDisplayFrameRect = new Rect();
+        getWindowVisibleDisplayFrame(visibleDisplayFrameRect);
+        if(visibleRect.width() > visibleDisplayFrameRect.width()) {
+            visibleRect.right = visibleRect.left + visibleDisplayFrameRect.width();
+        }
+        if(visibleRect.height() > visibleDisplayFrameRect.height()) {
+            visibleRect.bottom = visibleRect.bottom + visibleDisplayFrameRect.height();
+        }
         return visibleRect;
     }
 }

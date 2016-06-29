@@ -184,6 +184,12 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
         }
     }
 
+    private Rect imageRect;
+
+    public Rect getImageRect() {
+        return imageRect;
+    }
+
     @SuppressLint("DrawAllocation")
     @Override
     protected void onDraw(Canvas canvas) {
@@ -196,6 +202,9 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
         long startTime = SystemClock.uptimeMillis();
 
         Rect visibleRect = getVisibleRect();
+        if(visibleRect.isEmpty()) {
+            return;
+        }
 
         Log.d("countTime", "getVisibleRect " + (SystemClock.uptimeMillis() - startTime));
         startTime = SystemClock.uptimeMillis();
@@ -229,6 +238,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
         imageRect.top = (int) Math.ceil((visibleRect.top + mScale.getFromY()) * imageScale);
         imageRect.right = (int) Math.ceil((visibleRect.right + mScale.getFromX()) * imageScale);
         imageRect.bottom = (int) Math.ceil((visibleRect.bottom + mScale.getFromY()) * imageScale);
+        this.imageRect = imageRect;
 
         Log.d("countTime", "imageScale " + (SystemClock.uptimeMillis() - startTime));
         startTime = SystemClock.uptimeMillis();
