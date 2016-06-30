@@ -131,41 +131,66 @@ public class ImageManager {
     }
 
     /**
-     * @param imageScale
-     *        图片width/屏幕width 的值。也就是说如果imageScale = 4，表示图片的400像素显示在屏幕的100像素中，
-     *        imageScale越大一个单位点position包含的blockSize的正方形图片真实像素就越多。<br>
-     *        （blockSize*imageScale为图片实际像素,imageScale也可以理解为一个position点拥有的blockSize
-     *        正方形的个数）
+     * @param imageScale 图片width/屏幕width 的值。也就是说如果imageScale = 4，表示图片的400像素显示在屏幕的100像素中，
+     *                   imageScale越大一个单位点position包含的blockSize的正方形图片真实像素就越多。<br>
+     *                   （blockSize*imageScale为图片实际像素,imageScale也可以理解为一个position点拥有的blockSize
+     *                   正方形的个数）
      * @param imageRect
-     * @return  {@code List<DrawData>}
+     * @return {@code List<DrawData>}
      */
     public List<DrawData> getDrawData(float imageScale, Rect imageRect) {
+        // 为什么要把图片切成一块一块的，而不是直接加载整张图?
+        // 为了避免滚动手势导致图片持续加载大的图片，。比如显示区域是800800，向右移动2像素，难道要重新加载800800的图片区域。 而选择分成小份之前显示现在还要显示的那部分就不用重新加载了。
+
         long startTime = SystemClock.uptimeMillis();
+        // 获取图片数据信息。start(OnImageLoadListenner invalidateListener)会去调用线程用BitmapRegionDecoder加载图片数据
+        // 如果还没有加载好，返回空列表
         LoadData loadData = mLoadData;
         if (loadData == null || loadData.mDecoder == null) {
             return new ArrayList<DrawData>(0);
         }
+        // 图片的宽高
         int imageWidth = loadData.mImageWidth;
         int imageHeight = loadData.mImageHeight;
+        // CacheData图片块列表，List<CacheData>各个缩放级别的图片块
         List<CacheData> cacheDatas = loadData.mCacheDatas;
+
+        // 完整图片的缩略图，用于一开始展示，避免一开始没有加载好图片块，导致空白
         Bitmap cacheImageData = loadData.mCacheImageData;
+        //mCacheImageScale 完整图片缩略图的 缩放级别
         int cacheImageScale = loadData.mCacheImageScale;
 
+        // 方法要返回出去的图片绘制数据
         List<DrawData> drawDatas = new ArrayList<DrawData>();
+
+        Log.e("aaa", imageRect.toString());
+
+        // 滑出边界的填充矩形
+        Rect imageRectFill = new Rect(0, 0, 0, 0);
+
+        // 避免图片区域超出图片实际大小
         if (imageRect.left < 0) {
+            imageRectFill.right = loadData.mImageWidth;
+            imageRectFill.left = loadData.mImageWidth + imageRect.left;
             imageRect.left = 0;
         }
         if (imageRect.top < 0) {
             imageRect.top = 0;
         }
         if (imageRect.right > loadData.mImageWidth) {
+            imageRectFill.left = 0;
+            imageRectFill.right = imageRect.right - loadData.mImageWidth;
             imageRect.right = loadData.mImageWidth;
         }
         if (imageRect.bottom > loadData.mImageHeight) {
             imageRect.bottom = loadData.mImageHeight;
         }
+        imageRectFill.top = imageRect.top;
+        imageRectFill.bottom = imageRect.bottom;
+        int fillType = imageRectFill.left == 0 ? DrawData.FILL_RIGHT : DrawData.FILL_LEFT;
 
         if (cacheImageData == null) {
+            // 加载完整图片的缩略图
             try {
                 int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
                 int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
@@ -179,37 +204,23 @@ public class ImageManager {
                 e.printStackTrace();
             }
         } else {
+            // 如果有缩略图，我把缩略图根据显示的区域才下来，绘制的时候先绘制它，就不会有空白区域。而不是绘制完整的缩略图哦
             Rect cacheImageRect = new Rect(imageRect);
-            int cache = dip2px(context, 100);
-            cache = (int) (cache * imageScale);
-            cacheImageRect.right += cache;
-            cacheImageRect.top -= cache;
-            cacheImageRect.left -= cache;
-            cacheImageRect.bottom += cache;
+            cutThumbImage(imageScale, imageWidth, imageHeight,
+                    cacheImageData, cacheImageScale, drawDatas, cacheImageRect, 0);
 
-            if (cacheImageRect.left < 0) {
-                cacheImageRect.left = 0;
-            }
-            if (cacheImageRect.top < 0) {
-                cacheImageRect.top = 0;
-            }
-            if (cacheImageRect.right > imageWidth) {
-                cacheImageRect.right = imageWidth;
-            }
-            if (cacheImageRect.bottom > imageHeight) {
-                cacheImageRect.bottom = imageHeight;
-            }
-            Rect r = new Rect();
-            r.left = (int) Math.abs(1.0f * cacheImageRect.left / cacheImageScale);
-            r.right = (int) Math.abs(1.0f * cacheImageRect.right / cacheImageScale);
-            r.top = (int) Math.abs(1.0f * cacheImageRect.top / cacheImageScale);
-            r.bottom = (int) Math.abs(1.0f * cacheImageRect.bottom / cacheImageScale);
-            drawDatas.add(new DrawData(cacheImageData, r, cacheImageRect));
+            Rect cacheImageRectFill = new Rect(imageRectFill);
+            cutThumbImage(imageScale, imageWidth, imageHeight,
+                    cacheImageData, cacheImageScale, drawDatas, cacheImageRectFill, fillType);
 
-            Log.d("vvvv", "imageRect:" + imageRect + " tempImageScale:" + cacheImageScale);
-            Log.d("vvvv", "rect:" + r);
         }
+        // 根据外部传进来的缩放尺寸转化成2的指数次方的值
+        // 因为手势放大缩小操作要加载不同清晰度的图片区域，比如之前的图片缩放是4，现在缩放是4.2，难道要重新加载？
+        // 通过public int getNearScale(float imageScale)方法计算趋于2的指数次方的值（1，2，4，8，16）
+        // 比如3.9和4.2和4比较接近，就直接加载图片显示比例为4的图片块
         int scale = getNearScale(imageScale);
+
+        //如果缩略图的清晰够用，就不需要去加载图片块，直接画缩略图就好啦
         if (cacheImageScale <= scale && cacheImageData != null) {
             return drawDatas;
         }
@@ -217,7 +228,16 @@ public class ImageManager {
         // return drawDatas;
         // }
         Log.d("dddd", "scale: " + scale);
+
+        // 横向分多少份，纵向分多少分，才合理？加载的图片块宽高像素多少？
+        // 我采用了基准块（图片比例是1，一个图片块的宽高的sise） BASEBLOCKSIZE = context.getResources().getDisplayMetrics().widthPixels / 2;
+        // 图片缩放比例为1的话，图片块宽高是BASEBLOCKSIZE
+        // 图片缩放比例为4的话，图片块宽高是4*BASEBLOCKSIZE
+        // 图片没被位移，那么屏幕上显示横向2列，纵向getDisplayMetrics().heightPixels/BASEBLOCKSIZE行
+
         int blockSize = BASE_BLOCK_SIZE * scale;
+
+        // 计算完整图片被切分图片块的最大行数，和最大列数
         int maxRow = imageHeight / blockSize + (imageHeight % blockSize == 0 ? 0 : 1);
         int maxCol = imageWidth / blockSize + (imageWidth % blockSize == 0 ? 0 : 1);
 
@@ -238,7 +258,25 @@ public class ImageManager {
         if (endCol > maxCol) {
             endCol = maxCol;
         }
+        // 补充矩形对应的position范围
+        int startRowFill = imageRectFill.top / blockSize + (imageRectFill.top % blockSize == 0 ? 0 : 1) - 1;
+        int endRowFill = imageRectFill.bottom / blockSize + (imageRectFill.bottom % blockSize == 0 ? 0 : 1);
+        int startColFill = imageRectFill.left / blockSize + (imageRectFill.left % blockSize == 0 ? 0 : 1) - 1;
+        int endColFill = imageRectFill.right / blockSize + (imageRectFill.right % blockSize == 0 ? 0 : 1);
+        if (startRowFill < 0) {
+            startRowFill = 0;
+        }
+        if (startColFill < 0) {
+            startColFill = 0;
+        }
+        if (endRowFill > maxRow) {
+            endRowFill = maxRow;
+        }
+        if (endColFill > maxCol) {
+            endColFill = maxCol;
+        }
 
+        // 加载旁边一部分没显示的区域的图片块,因此上下左右都多加载了一部分的图片块
         int cacheStartRow = startRow - 1;
         int cacheEndRow = endRow + 1;
         int cacheStartCol = startCol - 1;
@@ -255,10 +293,28 @@ public class ImageManager {
         if (cacheEndCol > maxCol) {
             cacheEndCol = maxCol;
         }
+        // 补充矩形预加载部分
+        int cacheStartRowFill = startRowFill - 1;
+        int cacheEndRowFill = endRowFill + 1;
+        int cacheStartColFill = startColFill - 1;
+        int cacheEndColFill = endColFill + 1;
+        if (cacheStartRowFill < 0) {
+            cacheStartRowFill = 0;
+        }
+        if (cacheStartColFill < 0) {
+            cacheStartColFill = 0;
+        }
+        if (cacheEndRowFill > maxRow) {
+            cacheEndRowFill = maxRow;
+        }
+        if (cacheEndColFill > maxCol) {
+            cacheEndColFill = maxCol;
+        }
 
         Log.d("countTime", "preTime :" + (SystemClock.uptimeMillis() - startTime));
         startTime = SystemClock.uptimeMillis();
 
+        // 需要加载的图片块的坐标，Position其实就是[row,col]
         Set<Position> needShowPositions = new HashSet<Position>();
 
         // 移除掉之前的任务
@@ -266,22 +322,28 @@ public class ImageManager {
         int what = preMessageWhat == MESSAGE_BLOCK_1 ? MESSAGE_BLOCK_2 : MESSAGE_BLOCK_1;
         preMessageWhat = what;
 
+        // 如果当前的图片缩放切块列表不为空并且不是需要的缩放级别
         if (loadData.mCurrentCacheData != null && loadData.mCurrentCacheData.scale != scale) {
+            // 就把当前的缩放切块放在缓存列表中
             cacheDatas.add(new CacheData(loadData.mCurrentCacheData.scale, new HashMap<Position, Bitmap>(loadData.mCurrentCacheData.images)));
             loadData.mCurrentCacheData = null;
         }
+        // 如果当前的图片缩放切块列表是null,那就从列表中根据scale取
         if (loadData.mCurrentCacheData == null) {
             Iterator<CacheData> iterator = cacheDatas.iterator();
             while (iterator.hasNext()) {
                 CacheData cacheData = iterator.next();
                 if (scale == cacheData.scale) {
+                    //这边用了ConcurrentHashMap，因为有多线程操作它
                     loadData.mCurrentCacheData = new CacheData(scale, new ConcurrentHashMap<Position, Bitmap>(cacheData.images));
                     iterator.remove();
                 }
             }
         }
+        // 如果上面的列表中没取到，就新建一个
         if (loadData.mCurrentCacheData == null) {
             loadData.mCurrentCacheData = new CacheData(scale, new ConcurrentHashMap<Position, Bitmap>());
+            // 通知handler去加载所有需要的图片切块
             for (int row = startRow; row <= endRow; row++) {
                 for (int col = startCol; col <= endCol; col++) {
                     Position position = new Position(row, col);
@@ -289,6 +351,15 @@ public class ImageManager {
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
             }
+            for (int row = startRowFill; row <= endRowFill; row++) {
+                for (int col = startColFill; col <= endColFill; col++) {
+                    Position position = new Position(row, col);
+                    needShowPositions.add(position);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
+
+            // 加载上下左右的旁边边的切块（虽然这边没有显示，但是做了个预先加载操作）
 
             /**
              * <pre>
@@ -307,9 +378,21 @@ public class ImageManager {
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
             }
+            for (int row = cacheStartRowFill; row < startRowFill; row++) {
+                for (int col = cacheStartColFill; col <= cacheEndColFill; col++) {
+                    Position position = new Position(row, col);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
             // 下 #########
             for (int row = endRow + 1; row < cacheEndRow; row++) {
                 for (int col = cacheStartCol; col <= cacheEndCol; col++) {
+                    Position position = new Position(row, col);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
+            for (int row = endRowFill + 1; row < cacheEndRowFill; row++) {
+                for (int col = cacheStartColFill; col <= cacheEndColFill; col++) {
                     Position position = new Position(row, col);
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
@@ -322,6 +405,12 @@ public class ImageManager {
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
             }
+            for (int row = startRowFill; row < endRowFill; row++) {
+                for (int col = cacheStartColFill; col < startColFill; col++) {
+                    Position position = new Position(row, col);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
             // # 右
             // #
             for (int row = startRow; row < endRow; row++) {
@@ -330,20 +419,44 @@ public class ImageManager {
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
             }
+            for (int row = startRowFill; row < endRowFill; row++) {
+                for (int col = endRowFill + 1; col < cacheEndRowFill; col++) {
+                    Position position = new Position(row, col);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
         } else {
-            // 找出该scale所有存在的切图，和记录所有不存在的position
-            Set<Position> usePositions = new HashSet<>();
+            /*
+             * 找出该scale所有存在的图片切块，和记录所有不存在的position
+             */
+            Set<Position> usePositions = new HashSet<Position>();
             for (int row = startRow; row <= endRow; row++) {
                 for (int col = startCol; col <= endCol; col++) {
                     Position position = new Position(row, col);
                     Bitmap bitmap = loadData.mCurrentCacheData.images.get(position);
                     if (bitmap == null) {
+                        // 记录没有加载到的图片块，再后面的代码有用到
                         needShowPositions.add(position);
                         handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                     } else {
                         usePositions.add(position);
                         Rect rect = madeRect(bitmap, row, col, scale, imageScale);
                         drawDatas.add(new DrawData(bitmap, null, rect));
+                    }
+                }
+            }
+            for (int row = startRowFill; row <= endRowFill; row++) {
+                for (int col = startColFill; col <= endColFill; col++) {
+                    Position position = new Position(row, col);
+                    Bitmap bitmap = loadData.mCurrentCacheData.images.get(position);
+                    if (bitmap == null) {
+                        // 记录没有加载到的图片块，再后面的代码有用到
+                        needShowPositions.add(position);
+                        handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                    } else {
+                        usePositions.add(position);
+                        Rect rect = madeRect(bitmap, row, col, scale, imageScale);
+                        drawDatas.add(new DrawData(bitmap, null, rect, fillType));
                     }
                 }
             }
@@ -355,9 +468,24 @@ public class ImageManager {
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
             }
+            for (int row = cacheStartRowFill; row < startRowFill; row++) {
+                for (int col = cacheStartColFill; col <= cacheEndColFill; col++) {
+                    Position position = new Position(row, col);
+                    usePositions.add(position);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
             // 下 #########
             for (int row = endRow + 1; row < cacheEndRow; row++) {
                 for (int col = cacheStartCol; col <= cacheEndCol; col++) {
+                    Position position = new Position(row, col);
+                    usePositions.add(position);
+                    Log.d("9999", "下 " + position);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
+            for (int row = endRowFill + 1; row < cacheEndRowFill; row++) {
+                for (int col = cacheStartColFill; col <= cacheEndColFill; col++) {
                     Position position = new Position(row, col);
                     usePositions.add(position);
                     Log.d("9999", "下 " + position);
@@ -373,6 +501,13 @@ public class ImageManager {
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
             }
+            for (int row = startRowFill; row < endRowFill; row++) {
+                for (int col = cacheStartColFill; col < startColFill; col++) {
+                    Position position = new Position(row, col);
+                    usePositions.add(position);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
             // # 右
             // #
             for (int row = startRow; row < endRow; row++) {
@@ -382,15 +517,32 @@ public class ImageManager {
                     handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
                 }
             }
+            for (int row = startRowFill; row < endRowFill; row++) {
+                for (int col = endRowFill + 1; col < cacheEndRowFill; col++) {
+                    Position position = new Position(row, col);
+                    usePositions.add(position);
+                    handler.sendMessage(handler.obtainMessage(what, new MessageData(position, scale)));
+                }
+            }
+            // 移除掉那些没被用到的缓存的图片块
             loadData.mCurrentCacheData.images.keySet().retainAll(usePositions);
         }
 
         Log.d("countTime", "currentScale time :" + (SystemClock.uptimeMillis() - startTime));
         startTime = SystemClock.uptimeMillis();
 
-        //
         if (!needShowPositions.isEmpty()) {
+            // 根据趋于scale进行排序，如果当前需要的缩放级别是4，如果列表是1，8，2，4.那么排序后就是  4，2，1，8
+            // 因为要取相近的缩放级别的缩略图，显示效果更好
             Collections.sort(cacheDatas, new NearComparator(scale));
+
+            // 下面的代码要做好心理准备才可观看!!!!!!!!!!!
+
+            // 大意就是：比如循环不同的缩放级别。获取图片块列表中needShowPositions。但是每个级别的图片块显示范围不一样。
+            // 比如4个缩放级别2的图片块显示的区域是，1个缩放级别4的一个图片块的区域。缩放级别图片块越大显示的区域越广，
+            // 所以下面都是当前缩放级别的Position转化各对应缩放级别的图片块的Position。
+
+            // 循环图片块列表的缩放级别列表
             Iterator<CacheData> iterator = cacheDatas.iterator();
             while (iterator.hasNext()) {
                 CacheData cacheData = iterator.next();
@@ -411,59 +563,21 @@ public class ImageManager {
                     int startColKey = cacheStartCol / 2;
                     int endColKey = cacheEndCol / 2;
 
-                    Iterator<Entry<Position, Bitmap>> imageiterator = cacheData.images.entrySet().iterator();
-                    while (imageiterator.hasNext()) {
-                        Entry<Position, Bitmap> entry = imageiterator.next();
-                        Position position = entry.getKey();
-                        if (!(startRowKey <= position.row && position.row <= endRowKey && startColKey <= position.col && position.col <= endColKey)) {
-                            imageiterator.remove();
-                        }
-                    }
+                    shrink(drawDatas, needShowPositions, cacheData, scaleKey, ds, size,
+                            startRowKey, endRowKey, startColKey, endColKey, 0);
 
-                    Iterator<Entry<Position, Bitmap>> imagesIterator = cacheData.images.entrySet().iterator();
-                    while (imagesIterator.hasNext()) {
-                        Entry<Position, Bitmap> entry = imagesIterator.next();
-                        Position position = entry.getKey();
-                        int startPositionRow = position.row * ds;
-                        int endPositionRow = startPositionRow + ds;
-                        int startPositionCol = position.col * ds;
-                        int endPositionCol = startPositionCol + ds;
-                        Bitmap bitmap = entry.getValue();
-                        int iW = bitmap.getWidth();
-                        int iH = bitmap.getHeight();
+                    // 填充区域范围
+                    int startRowKeyFill = cacheStartRowFill / 2;
+                    int endRowKeyFill = cacheEndRowFill / 2;
+                    int startColKeyFill = cacheStartColFill / 2;
+                    int endColKeyFill = cacheEndColFill / 2;
 
-                        // 单位图片的大小
-                        int blockImageSize = BASE_BLOCK_SIZE / ds;
-
-                        Log.d("nnnn", " bitmap.getWidth():" + bitmap.getWidth() + " imageHeight:" + iH);
-                        for (int row = startPositionRow, i = 0; row <= endPositionRow; row++, i++) {
-                            int top = i * blockImageSize;
-                            if (top >= iH) {
-                                break;
-                            }
-                            for (int col = startPositionCol, j = 0; col <= endPositionCol; col++, j++) {
-                                int left = j * blockImageSize;
-                                if (left >= iW) {
-                                    break;
-                                }
-                                if (needShowPositions.remove(new Position(row, col))) {
-                                    int right = left + blockImageSize;
-                                    int bottom = top + blockImageSize;
-                                    if (right > iW) {
-                                        right = iW;
-                                    }
-                                    if (bottom > iH) {
-                                        bottom = iH;
-                                    }
-                                    Rect rect = new Rect();
-                                    rect.left = col * size;
-                                    rect.top = row * size;
-                                    rect.right = rect.left + (right - left) * scaleKey;
-                                    rect.bottom = rect.top + (bottom - top) * scaleKey;
-                                    drawDatas.add(new DrawData(bitmap, new Rect(left, top, right, bottom), rect));
-                                }
-                            }
-                        }
+                    if (startColFill == 0) {
+                        shrink(drawDatas, needShowPositions, cacheData, scaleKey, ds, size,
+                                startRowKeyFill, endRowKeyFill, startColKeyFill, endColKeyFill, DrawData.FILL_LEFT);
+                    } else {
+                        shrink(drawDatas, needShowPositions, cacheData, scaleKey, ds, size,
+                                startRowKeyFill, endRowKeyFill, startColKeyFill, endColKeyFill, DrawData.FILL_RIGHT);
                     }
 
                     Log.d("countTime", ",缩小的图 time :" + (SystemClock.uptimeMillis() - startTime));
@@ -480,27 +594,17 @@ public class ImageManager {
 
                     Log.d("nnnn", "startRowKey" + startRowKey + " endRowKey:+" + endRowKey + " endColKey:" + endColKey);
 
-                    Position tempPosition = new Position();
-                    Iterator<Entry<Position, Bitmap>> imageiterator = cacheData.images.entrySet().iterator();
-                    while (imageiterator.hasNext()) {
-                        Entry<Position, Bitmap> entry = imageiterator.next();
-                        Position position = entry.getKey();
-                        if (!(startRowKey <= position.row && position.row <= endRowKey && startColKey <= position.col && position.col <= endColKey)) {
-                            imageiterator.remove();
-                            Log.d("nnnn", "position:" + position + " remove");
-                        } else {
-                            Bitmap bitmap = entry.getValue();
-                            tempPosition.set(position.row / 2 + (position.row % 2 == 0 ? 0 : 1), position.col / 2 + (position.col % 2 == 0 ? 0 : 1));
-                            if (needShowPositions.contains(tempPosition)) {
-                                Rect rect = new Rect();
-                                rect.left = position.col * size;
-                                rect.top = position.row * size;
-                                rect.right = rect.left + bitmap.getWidth() * scaleKey;
-                                rect.bottom = rect.top + bitmap.getHeight() * scaleKey;
-                                drawDatas.add(new DrawData(bitmap, null, rect));
-                            }
-                        }
-                    }
+                    zoom(drawDatas, needShowPositions, cacheData, scaleKey, size,
+                            startRowKey, endRowKey, startColKey, endColKey, 0);
+
+                    // 补充区域范围
+                    int startRowKeyFill = imageRectFill.top / size + (imageRectFill.top % size == 0 ? 0 : 1) - 1;
+                    int endRowKeyFill = imageRectFill.bottom / size + (imageRectFill.bottom % size == 0 ? 0 : 1);
+                    int startColKeyFill = imageRectFill.left / size + (imageRectFill.left % size == 0 ? 0 : 1) - 1;
+                    int endColKeyFill = imageRectFill.right / size + (imageRectFill.right % size == 0 ? 0 : 1);
+
+                    zoom(drawDatas, needShowPositions, cacheData, scaleKey, size,
+                            startRowKeyFill, endRowKeyFill, startColKeyFill, endColKeyFill, fillType);
 
                     Log.d("countTime", " 放大的图  time :" + (SystemClock.uptimeMillis() - startTime));
                     startTime = SystemClock.uptimeMillis();
@@ -510,6 +614,130 @@ public class ImageManager {
             }
         }
         return drawDatas;
+    }
+
+    private void cutThumbImage(float imageScale, int imageWidth, int imageHeight,
+                               Bitmap cacheImageData, int cacheImageScale,
+                               List<DrawData> drawDatas, Rect cacheImageRect, int fillType) {
+        int cache = dip2px(context, 100);
+        cache = (int) (cache * imageScale);
+        cacheImageRect.right += cache;
+        cacheImageRect.top -= cache;
+        cacheImageRect.left -= cache;
+        cacheImageRect.bottom += cache;
+
+        if (cacheImageRect.left < 0) {
+            cacheImageRect.left = 0;
+        }
+        if (cacheImageRect.top < 0) {
+            cacheImageRect.top = 0;
+        }
+        if (cacheImageRect.right > imageWidth) {
+            cacheImageRect.right = imageWidth;
+        }
+        if (cacheImageRect.bottom > imageHeight) {
+            cacheImageRect.bottom = imageHeight;
+        }
+        Rect r = new Rect();
+        r.left = (int) Math.abs(1.0f * cacheImageRect.left / cacheImageScale);
+        r.right = (int) Math.abs(1.0f * cacheImageRect.right / cacheImageScale);
+        r.top = (int) Math.abs(1.0f * cacheImageRect.top / cacheImageScale);
+        r.bottom = (int) Math.abs(1.0f * cacheImageRect.bottom / cacheImageScale);
+        drawDatas.add(new DrawData(cacheImageData, r, cacheImageRect, fillType));
+
+        Log.d("vvvv", " tempImageScale:" + cacheImageScale);
+        Log.d("vvvv", "rect:" + r);
+    }
+
+    /**
+     * 缩小
+     */
+    private void shrink(List<DrawData> drawDatas, Set<Position> needShowPositions,
+                        CacheData cacheData, int scaleKey, int ds, int size,
+                        int startRowKey, int endRowKey, int startColKey, int endColKey, int fillType) {
+        Iterator<Entry<Position, Bitmap>> imageIterator = cacheData.images.entrySet().iterator();
+        while (imageIterator.hasNext()) {
+            Entry<Position, Bitmap> entry = imageIterator.next();
+            Position position = entry.getKey();
+            if (!(startRowKey <= position.row && position.row <= endRowKey && startColKey <= position.col && position.col <= endColKey)) {
+                imageIterator.remove();
+            }
+        }
+
+        Iterator<Entry<Position, Bitmap>> imagesIterator = cacheData.images.entrySet().iterator();
+        while (imagesIterator.hasNext()) {
+            Entry<Position, Bitmap> entry = imagesIterator.next();
+            Position position = entry.getKey();
+            int startPositionRow = position.row * ds;
+            int endPositionRow = startPositionRow + ds;
+            int startPositionCol = position.col * ds;
+            int endPositionCol = startPositionCol + ds;
+            Bitmap bitmap = entry.getValue();
+            int iW = bitmap.getWidth();
+            int iH = bitmap.getHeight();
+
+            // 单位图片的大小
+            int blockImageSize = BASE_BLOCK_SIZE / ds;
+
+            Log.d("nnnn", " bitmap.getWidth():" + bitmap.getWidth() + " imageHeight:" + iH);
+            for (int row = startPositionRow, i = 0; row <= endPositionRow; row++, i++) {
+                int top = i * blockImageSize;
+                if (top >= iH) {
+                    break;
+                }
+                for (int col = startPositionCol, j = 0; col <= endPositionCol; col++, j++) {
+                    int left = j * blockImageSize;
+                    if (left >= iW) {
+                        break;
+                    }
+                    if (needShowPositions.remove(new Position(row, col))) {
+                        int right = left + blockImageSize;
+                        int bottom = top + blockImageSize;
+                        if (right > iW) {
+                            right = iW;
+                        }
+                        if (bottom > iH) {
+                            bottom = iH;
+                        }
+                        Rect rect = new Rect();
+                        rect.left = col * size;
+                        rect.top = row * size;
+                        rect.right = rect.left + (right - left) * scaleKey;
+                        rect.bottom = rect.top + (bottom - top) * scaleKey;
+                        drawDatas.add(new DrawData(bitmap, new Rect(left, top, right, bottom), rect, fillType));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 放大
+     */
+    private void zoom(List<DrawData> drawDatas, Set<Position> needShowPositions,
+                      CacheData cacheData, int scaleKey, int size,
+                      int startRowKey, int endRowKey, int startColKey, int endColKey, int fillType) {
+        Position tempPosition = new Position();
+        Iterator<Entry<Position, Bitmap>> imageiterator = cacheData.images.entrySet().iterator();
+        while (imageiterator.hasNext()) {
+            Entry<Position, Bitmap> entry = imageiterator.next();
+            Position position = entry.getKey();
+            if (!(startRowKey <= position.row && position.row <= endRowKey && startColKey <= position.col && position.col <= endColKey)) {
+                imageiterator.remove();
+                Log.d("nnnn", "position:" + position + " remove");
+            } else {
+                Bitmap bitmap = entry.getValue();
+                tempPosition.set(position.row / 2 + (position.row % 2 == 0 ? 0 : 1), position.col / 2 + (position.col % 2 == 0 ? 0 : 1));
+                if (needShowPositions.contains(tempPosition)) {
+                    Rect rect = new Rect();
+                    rect.left = position.col * size;
+                    rect.top = position.row * size;
+                    rect.right = rect.left + bitmap.getWidth() * scaleKey;
+                    rect.bottom = rect.top + bitmap.getHeight() * scaleKey;
+                    drawDatas.add(new DrawData(bitmap, null, rect, fillType));
+                }
+            }
+        }
     }
 
     /**

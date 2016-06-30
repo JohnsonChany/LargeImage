@@ -14,6 +14,7 @@ package com.shizhefei.view.largeimage;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.ViewGroup;
 
 import com.shizhefei.view.largeimage.PhotoViewAttacher.OnPhotoTapListener;
 

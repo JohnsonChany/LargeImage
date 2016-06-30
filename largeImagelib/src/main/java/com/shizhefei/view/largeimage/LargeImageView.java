@@ -32,11 +32,14 @@ import android.util.Log;
 import com.shizhefei.view.largeimage.model.DrawData;
 import com.shizhefei.view.largeimage.manager.ImageManager;
 import com.shizhefei.view.largeimage.manager.ImageManager.OnImageLoadListener;
-import com.shizhefei.view.largeimage.model.Scale;
+import com.shizhefei.view.largeimage.model.ScaleData;
 
 public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoadListener {
 
     private Paint paint;
+
+    private ScaleData mScaleData = new ScaleData(1, 0, 0);
+    private ImageManager imageManager;
 
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public LargeImageView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
@@ -70,13 +73,12 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
         initPaint();
     }
 
-    public void setScale(float scale, float offsetX, float offsetY) {
-        mScale.setScale(scale);
-        mScale.setFromX((int) offsetX);
-        mScale.setFromY((int) offsetY);
-        notifyInvalidate();
+    @Override
+    public void setScale(ScaleData scaleData) {
+        this.mScaleData = scaleData;
     }
 
+    @Override
     public int getImageWidth() {
         if (imageManager != null) {
             return imageManager.getWidth();
@@ -84,6 +86,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
         return 0;
     }
 
+    @Override
     public int getImageHeight() {
         if (imageManager != null) {
             return imageManager.getHeight();
@@ -91,12 +94,15 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
         return 0;
     }
 
-    public Scale getScale() {
-        return mScale;
+    @Override
+    public ScaleData getScale() {
+        return mScaleData;
     }
 
-    private Scale mScale = new Scale(1, 0, 0);
-    private ImageManager imageManager;
+    @Override
+    public void notifyScaleChanged() {
+        notifyInvalidate();
+    }
 
     @Override
     protected void onAttachedToWindow() {
@@ -117,16 +123,16 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
     }
 
     public void setImage(String filePath) {
-        mScale.setScale(1);
-        mScale.setFromX(0);
-        mScale.setFromY(0);
+        mScaleData.scale = 1;
+        mScaleData.fromX = 0;
+        mScaleData.fromY = 0;
         imageManager.load(filePath);
     }
 
     public void setImage(InputStream inputStream) {
-        mScale.setScale(1);
-        mScale.setFromX(0);
-        mScale.setFromY(0);
+        mScaleData.scale = 1;
+        mScaleData.fromX = 0;
+        mScaleData.fromY = 0;
         imageManager.load(inputStream);
     }
 
@@ -197,7 +203,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
             return;
         }
 
-        Log.d("countTime", "----------------- mScale.scale" + mScale.getScale());
+        Log.d("countTime", "----------------- mScale.scale" + mScaleData.fromX);
 
         long startTime = SystemClock.uptimeMillis();
 
@@ -225,7 +231,7 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
         Log.d("countTime", "clipRect " + (SystemClock.uptimeMillis() - startTime));
         startTime = SystemClock.uptimeMillis();
 
-        float width = mScale.getScale() * getWidth();
+        float width = mScaleData.scale * getWidth();
         int imgWidth = imageManager.getWidth();
 
         Log.d("countTime", "getWidth " + (SystemClock.uptimeMillis() - startTime));
@@ -234,10 +240,21 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
 
         // 需要显示的图片的实际宽度。
         Rect imageRect = new Rect();
-        imageRect.left = (int) Math.ceil((visibleRect.left + mScale.getFromX()) * imageScale);
-        imageRect.top = (int) Math.ceil((visibleRect.top + mScale.getFromY()) * imageScale);
-        imageRect.right = (int) Math.ceil((visibleRect.right + mScale.getFromX()) * imageScale);
-        imageRect.bottom = (int) Math.ceil((visibleRect.bottom + mScale.getFromY()) * imageScale);
+        imageRect.left = (int) Math.ceil((visibleRect.left + mScaleData.fromX) * imageScale);
+        imageRect.top = (int) Math.ceil((visibleRect.top + mScaleData.fromY) * imageScale);
+        imageRect.right = (int) Math.ceil((visibleRect.right + mScaleData.fromX) * imageScale);
+        imageRect.bottom = (int) Math.ceil((visibleRect.bottom + mScaleData.fromY) * imageScale);
+
+        // x轴超出一倍的范围，偏移量清零
+        if(imageRect.left >= imgWidth) {
+            imageRect.offset(-imgWidth, 0);
+            mScaleData.fromX -= imgWidth / imageScale;
+        }
+        if(imageRect.left <=  -1 * imgWidth) {
+            imageRect.offset(imgWidth, 0);
+            mScaleData.fromX += imgWidth / imageScale;
+        }
+
         this.imageRect = imageRect;
 
         Log.d("countTime", "imageScale " + (SystemClock.uptimeMillis() - startTime));
@@ -250,10 +267,16 @@ public class LargeImageView extends UpdateView implements IPhotoView, OnImageLoa
 
         for (DrawData data : drawData) {
             Rect drawRect = data.imageRect;
-            drawRect.left = (int) (drawRect.left / imageScale - mScale.getFromX());
-            drawRect.top = (int) (drawRect.top / imageScale - mScale.getFromY());
-            drawRect.right = (int) (Math.ceil(drawRect.right / imageScale) - mScale.getFromX());
-            drawRect.bottom = (int) (Math.ceil(drawRect.bottom / imageScale) - mScale.getFromY());
+            drawRect.left = (int) (drawRect.left / imageScale - mScaleData.fromX);
+            drawRect.top = (int) (drawRect.top / imageScale - mScaleData.fromY);
+            drawRect.right = (int) (Math.ceil(drawRect.right / imageScale) - mScaleData.fromX);
+            drawRect.bottom = (int) (Math.ceil(drawRect.bottom / imageScale) - mScaleData.fromY);
+
+            if(data.fillType == DrawData.FILL_LEFT) {
+                drawRect.offset((int)(-1 * imgWidth / imageScale), 0);
+            } else if(data.fillType == DrawData.FILL_RIGHT) {
+                drawRect.offset((int)(imgWidth / imageScale), 0);
+            }
             canvas.drawBitmap(data.bitmap, data.srcRect, drawRect, null);
             canvas.drawRect(drawRect, paint);
         }

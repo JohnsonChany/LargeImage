@@ -27,182 +27,182 @@ import android.view.View.OnTouchListener;
 
 import com.almeros.android.multitouch.MoveGestureDetector;
 import com.almeros.android.multitouch.RotateGestureDetector;
+import com.shizhefei.view.largeimage.model.ScaleData;
 
 public class PhotoViewAttacher<PHOTOVIEW extends View & IPhotoView> implements OnTouchListener {
-	private PHOTOVIEW photoview;
-	private ScaleGestureDetector mScaleDetector;
-	private RotateGestureDetector mRotateDetector;
-	private MoveGestureDetector mMoveDetector;
-	private GestureDetector gestureDetector;
+    private PHOTOVIEW photoview;
+    private ScaleGestureDetector mScaleDetector;
+    private RotateGestureDetector mRotateDetector;
+    private MoveGestureDetector mMoveDetector;
+    private GestureDetector gestureDetector;
 
-	public PhotoViewAttacher(PHOTOVIEW photoview) {
-		super();
-		this.photoview = photoview;
-		Context context = photoview.getContext();
-		photoview.setOnTouchListener(this);
+    private float mRotationDegrees = 0;
 
-		mScaleDetector = new ScaleGestureDetector(context, new ScaleListener());
-		mRotateDetector = new RotateGestureDetector(context, new RotateListener());
-		mMoveDetector = new MoveGestureDetector(context, new MoveListener());
-		gestureDetector = new GestureDetector(context, simpleOnGestureListener);
-	}
+    public PhotoViewAttacher(PHOTOVIEW photoview) {
+        super();
+        this.photoview = photoview;
+        Context context = photoview.getContext();
+        photoview.setOnTouchListener(this);
 
-	@SuppressLint("ClickableViewAccessibility")
-	public boolean onTouch(View v, MotionEvent event) {
-		mScaleDetector.onTouchEvent(event);
-		mRotateDetector.onTouchEvent(event);
-		// mMoveDetector.onTouchEvent(event);
-		gestureDetector.onTouchEvent(event);
+        mScaleDetector = new ScaleGestureDetector(context, new ScaleListener());
+        mRotateDetector = new RotateGestureDetector(context, new RotateListener());
+        mMoveDetector = new MoveGestureDetector(context, new MoveListener());
+        gestureDetector = new GestureDetector(context, simpleOnGestureListener);
+    }
 
-		// float scaledImageCenterX = (photoview.getImageWidth() * mScaleFactor)
-		// / 2;
-		// float scaledImageCenterY = (photoview.getImageHeight() *
-		// mScaleFactor) / 2;
-		//
-		// mMatrix.reset();
-		// mMatrix.postScale(mScaleFactor, mScaleFactor);
-		// mMatrix.postRotate(mRotationDegrees, scaledImageCenterX,
-		// scaledImageCenterY);
-		// mMatrix.postTranslate(mFocusX - scaledImageCenterX, mFocusY -
-		// scaledImageCenterY);
-		// if (mScaleFactor < photoview.getScale().scale) {// 缩小
-		// float width = photoview.getWidth() * photoview.getScale().scale;
-		// float cWidth = photoview.getWidth() * mScaleFactor;
-		//
-		// photoview.setScale(mScaleFactor, mFocusX, mFocusY);
-		// } else {// 放大
-		// float width = photoview.getWidth() * photoview.getScale().scale;
-		// float cWidth = photoview.getWidth() * mScaleFactor;
-		//
-		// float height = 1.0f * photoview.getImageHeight() *
-		// photoview.getWidth() / photoview.getImageWidth() *
-		// photoview.getScale().scale;
-		// float cHeight = 1.0f * photoview.getImageHeight() *
-		// photoview.getWidth() / photoview.getImageWidth() * mScaleFactor;
-		//
-		// photoview.setScale(mScaleFactor, (cWidth - width) / 2, (cHeight -
-		// height) / 2);
-		// }
+    @SuppressLint("ClickableViewAccessibility")
+    public boolean onTouch(View v, MotionEvent event) {
+        mScaleDetector.onTouchEvent(event);
+        mRotateDetector.onTouchEvent(event);
+        // mMoveDetector.onTouchEvent(event);
+        gestureDetector.onTouchEvent(event);
 
-		photoview.setScale(mScaleFactor, mFocusX, mFocusY);
-		return true; // indicate event was handled
-	}
+        // float scaledImageCenterX = (photoview.getImageWidth() * mScaleFactor)
+        // / 2;
+        // float scaledImageCenterY = (photoview.getImageHeight() *
+        // mScaleFactor) / 2;
+        //
+        // mMatrix.reset();
+        // mMatrix.postScale(mScaleFactor, mScaleFactor);
+        // mMatrix.postRotate(mRotationDegrees, scaledImageCenterX,
+        // scaledImageCenterY);
+        // mMatrix.postTranslate(mFocusX - scaledImageCenterX, mFocusY -
+        // scaledImageCenterY);
+        // if (mScaleFactor < photoview.getScale().scale) {// 缩小
+        // float width = photoview.getWidth() * photoview.getScale().scale;
+        // float cWidth = photoview.getWidth() * mScaleFactor;
+        //
+        // photoview.setScale(mScaleFactor, mFocusX, mFocusY);
+        // } else {// 放大
+        // float width = photoview.getWidth() * photoview.getScale().scale;
+        // float cWidth = photoview.getWidth() * mScaleFactor;
+        //
+        // float height = 1.0f * photoview.getImageHeight() *
+        // photoview.getWidth() / photoview.getImageWidth() *
+        // photoview.getScale().scale;
+        // float cHeight = 1.0f * photoview.getImageHeight() *
+        // photoview.getWidth() / photoview.getImageWidth() * mScaleFactor;
+        //
+        // photoview.setScale(mScaleFactor, (cWidth - width) / 2, (cHeight -
+        // height) / 2);
+        // }
+        photoview.notifyScaleChanged();
+        return true; // indicate event was handled
+    }
 
-	private float mScaleFactor = 1;
-	private float mRotationDegrees = 0;
-	private float mFocusX = 0;
-	private float mFocusY = 0;
+    private SimpleOnGestureListener simpleOnGestureListener = new SimpleOnGestureListener() {
+        @Override
+        public boolean onDoubleTap(MotionEvent e) {
+            ScaleData scaleData = photoview.getScale();
+            if (scaleData.scale < 0.5) {
+                scaleData.scale = 0.5f;
+            } else if (scaleData.scale < 1) {
+                scaleData.scale = 1f;
+            } else if (scaleData.scale < 2) {
+                scaleData.scale = 2f;
+            } else {
+                scaleData.scale = 0.5f;
+            }
+            scaleData.fromX = 0;
+            scaleData.fromY = 0;
+            return true;
+        }
 
-	private SimpleOnGestureListener simpleOnGestureListener = new SimpleOnGestureListener() {
-		@Override
-		public boolean onDoubleTap(MotionEvent e) {
-			if (mScaleFactor < 0.5) {
-				mScaleFactor = 0.5f;
-			} else if (mScaleFactor < 1) {
-				mScaleFactor = 1f;
-			} else if (mScaleFactor < 2) {
-				mScaleFactor = 2f;
-			} else {
-				mScaleFactor = 0.5f;
-			}
-			mFocusX = 0;
-			mFocusY = 0;
-			return true;
-		};
+//        @Override
+//        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+//            mFocusX -= velocityX;
+//            mFocusY -= velocityY;
+//            photoview.setScale(mScaleFactor, mFocusX, mFocusY);
+//            return false;
+//        }
 
-//		@Override
-//		public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-//			mFocusX -= velocityX;
-//			mFocusY -= velocityY;
-//			photoview.setScale(mScaleFactor, mFocusX, mFocusY);
-//			return false;
-//		};
-//		
-		public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-			mFocusX += distanceX;
-			mFocusY += distanceY;
-			photoview.setScale(mScaleFactor, mFocusX, mFocusY);
-			return false;
-		};
-		
+        public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+            ScaleData scaleData = photoview.getScale();
+            scaleData.fromX += distanceX;
+            scaleData.fromY += distanceY;
+            return false;
+        }
 
-		@Override
-		public boolean onSingleTapUp(MotionEvent e) {
-			if (onPhotoTapListener != null) {
-				onPhotoTapListener.onPhotoTap(photoview, e);
-			}
-			return super.onSingleTapUp(e);
-		}
-	};
 
-	private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
+        @Override
+        public boolean onSingleTapUp(MotionEvent e) {
+            if (onPhotoTapListener != null) {
+                onPhotoTapListener.onPhotoTap(photoview, e);
+            }
+            return super.onSingleTapUp(e);
+        }
+    };
 
-		@TargetApi(Build.VERSION_CODES.HONEYCOMB)
-		@Override
-		public boolean onScale(ScaleGestureDetector detector) {
+    private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
 
-			// mFocusX = mFocusX - (detector.getFocusX() - mFocusX) *
-			// (mScaleFactor - detector.getScaleFactor()*mScaleFactor);
-			// mFocusY = mFocusY - (detector.getFocusY() - mFocusY) *
-			// (mScaleFactor - detector.getScaleFactor()*mScaleFactor);
+        @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+        @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+            ScaleData scaleData = photoview.getScale();
 
-			mScaleFactor *= detector.getScaleFactor(); // scale change since
-														// previous event
+            // mFocusX = mFocusX - (detector.getFocusX() - mFocusX) *
+            // (mScaleFactor - detector.getScaleFactor()*mScaleFactor);
+            // mFocusY = mFocusY - (detector.getFocusY() - mFocusY) *
+            // (mScaleFactor - detector.getScaleFactor()*mScaleFactor);
 
-			// Don't let the object get too small or too large.
-			mScaleFactor = Math.max(0.1f, Math.min(mScaleFactor, 100.0f));
+            scaleData.scale *= detector.getScaleFactor(); // scale change since
+            // previous event
 
-			Log.d("hhhh",
-					"detector.getPreviousSpanX():" + detector.getPreviousSpanX() + " detector.getPreviousSpanY():" + detector.getPreviousSpanY());
+            // Don't let the object get too small or too large.
+            scaleData.scale = Math.max(0.1f, Math.min(scaleData.scale, 100.0f));
 
-			Log.d("hhhh", "detector.getCurrentSpanX():" + detector.getCurrentSpanX() + " detector.getCurrentSpanY():" + detector.getCurrentSpanY());
+            Log.d("hhhh",
+                    "detector.getPreviousSpanX():" + detector.getPreviousSpanX() + " detector.getPreviousSpanY():" + detector.getPreviousSpanY());
 
-			Log.d("hhhh", "detector.getFocusX():" + detector.getFocusX() + " detector.getFocusY():" + detector.getFocusY());
+            Log.d("hhhh", "detector.getCurrentSpanX():" + detector.getCurrentSpanX() + " detector.getCurrentSpanY():" + detector.getCurrentSpanY());
 
-			// detector.get
+            Log.d("hhhh", "detector.getFocusX():" + detector.getFocusX() + " detector.getFocusY():" + detector.getFocusY());
 
-			// mFocusX = detector.getFocusX();
-			// mFocusY = detector.getFocusY();
+            // detector.get
 
-			// mFocusX = mFocusX - (detector.getFocusX() - mFocusX) *
-			// mScaleFactor;
-			// mFocusY = mFocusY - (detector.getFocusY() - mFocusY) *
-			// mScaleFactor;
-			return true;
-		}
-	}
+            // mFocusX = detector.getFocusX();
+            // mFocusY = detector.getFocusY();
 
-	private class RotateListener extends RotateGestureDetector.SimpleOnRotateGestureListener {
+            // mFocusX = mFocusX - (detector.getFocusX() - mFocusX) *
+            // mScaleFactor;
+            // mFocusY = mFocusY - (detector.getFocusY() - mFocusY) *
+            // mScaleFactor;
+            return true;
+        }
+    }
 
-		@Override
-		public boolean onRotate(RotateGestureDetector detector) {
-			mRotationDegrees -= detector.getRotationDegreesDelta();
-			return true;
-		}
-	}
+    private class RotateListener extends RotateGestureDetector.SimpleOnRotateGestureListener {
 
-	private class MoveListener extends MoveGestureDetector.SimpleOnMoveGestureListener {
+        @Override
+        public boolean onRotate(RotateGestureDetector detector) {
+            mRotationDegrees -= detector.getRotationDegreesDelta();
+            return true;
+        }
+    }
 
-		@Override
-		public boolean onMove(MoveGestureDetector detector) {
-			PointF d = detector.getFocusDelta();
-			mFocusX -= d.x;
-			mFocusY -= d.y;
+    private class MoveListener extends MoveGestureDetector.SimpleOnMoveGestureListener {
 
-			// mFocusX = detector.getFocusX();
-			// mFocusY = detector.getFocusY();
-			return true;
-		}
-	}
+        @Override
+        public boolean onMove(MoveGestureDetector detector) {
+            ScaleData scaleData = photoview.getScale();
+            PointF d = detector.getFocusDelta();
+            scaleData.fromX -= d.x;
+            scaleData.fromY -= d.y;
 
-	public void setOnPhotoTapListener(OnPhotoTapListener onPhotoTapListener) {
-		this.onPhotoTapListener = onPhotoTapListener;
-	}
+            // mFocusX = detector.getFocusX();
+            // mFocusY = detector.getFocusY();
+            return true;
+        }
+    }
 
-	private OnPhotoTapListener onPhotoTapListener;
+    public void setOnPhotoTapListener(OnPhotoTapListener onPhotoTapListener) {
+        this.onPhotoTapListener = onPhotoTapListener;
+    }
 
-	public static interface OnPhotoTapListener {
-		public void onPhotoTap(View view, MotionEvent e);
-	}
+    private OnPhotoTapListener onPhotoTapListener;
+
+    public static interface OnPhotoTapListener {
+        public void onPhotoTap(View view, MotionEvent e);
+    }
 
 }

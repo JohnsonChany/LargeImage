@@ -12,13 +12,13 @@ limitations under the License.
  */
 package com.shizhefei.view.largeimage;
 
-import com.shizhefei.view.largeimage.model.Scale;
+import com.shizhefei.view.largeimage.model.ScaleData;
 
 import java.io.InputStream;
 
 public interface IPhotoView {
 
-    void setScale(float scale, float offsetX, float offsetY);
+    void setScale(ScaleData scaleData);
 
     void setImage(String filePath);
 
@@ -28,6 +28,8 @@ public interface IPhotoView {
 
     int getImageHeight();
 
-    Scale getScale();
+    ScaleData getScale();
+
+    void notifyScaleChanged();
 
 }
